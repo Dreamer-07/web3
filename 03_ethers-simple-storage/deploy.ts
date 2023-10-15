@@ -18,7 +18,7 @@ async function main() {
     console.log("Depolying, please wait...");
     const contract = await factory.deploy();
     // 等待区块交易完成(获取交易回执)
-    const deploymentReceipt = await contract.deployTransaction.wait();
+    const deploymentReceipt = await contract.deployTransaction.wait(1);
     // 查看合约地址
     console.log("contract address:" + contract.address);
 
