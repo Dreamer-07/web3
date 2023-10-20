@@ -4,6 +4,10 @@ import "hardhat-deploy";
 import "hardhat-gas-reporter";
 import "solidity-coverage";
 import "dotenv/config";
+import { ProxyAgent, setGlobalDispatcher } from "undici";
+
+const proxyAgent = new ProxyAgent("http://127.0.0.1:7890");
+setGlobalDispatcher(proxyAgent);
 
 const {
   PRIVATE_KEY = "",
@@ -18,10 +22,13 @@ const config: HardhatUserConfig = {
     hardhat: {
       chainId: 31337,
     },
+    localhost: {
+      chainId: 31337,
+    },
     sepolia: {
       url: SEPOLIA_RPC_URL,
       accounts: [PRIVATE_KEY],
-      chainId: 111555111,
+      chainId: 11155111,
     },
   },
   solidity: {
@@ -38,7 +45,7 @@ const config: HardhatUserConfig = {
     apiKey: ETHERSCAN_API_KEY,
   },
   gasReporter: {
-    enabled: false,
+    enabled: true,
     currency: "USD",
     outputFile: "gas-reports.txt",
     noColors: true,
@@ -49,6 +56,10 @@ const config: HardhatUserConfig = {
       default: 0,
       1: 0,
     },
+  },
+  mocha: {
+    // 配置测试上链超时时间，一般可以设置大一点
+    timeout: 50000,
   },
 };
 

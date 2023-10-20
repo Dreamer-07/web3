@@ -1,0 +1,41 @@
+{
+  "language": "Solidity",
+  "sources": {
+    "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol": {
+      "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface AggregatorV3Interface {\n  function decimals() external view returns (uint8);\n\n  function description() external view returns (string memory);\n\n  function version() external view returns (uint256);\n\n  function getRoundData(\n    uint80 _roundId\n  ) external view returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound);\n\n  function latestRoundData()\n    external\n    view\n    returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound);\n}\n"
+    },
+    "contracts/Main.sol": {
+      "content": "// SPDX-License-Identifier: MIT\r\npragma solidity ^0.8.8;\r\n\r\nimport \"@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol\";\r\n// 引入库\r\nimport \"./PriceCovert.sol\";\r\n\r\n// 通过 \"合约名__错误信息的格式来定义错误信息\"\r\nerror FundMe__SendEnough();\r\nerror FundMe__OnlyOwner();\r\nerror FundMe__CallFailed();\r\n\r\ncontract FundMe {\r\n    // 通过 using 关键字可以将指定的库符合到指定类型A(符合后当前合约内的该类型A可以直接调用库中的方法，库中的函数将会默认接收调用函数对象的实例作为第一个参数)\r\n    using PriceCovert for uint256;\r\n\r\n    uint256 public constant MINIMUM_USD = 50 * 10 ** 18;\r\n\r\n    address private immutable i_owner;\r\n    // 存储在 storage 中的变量使用 s_ 开头\r\n    address[] private s_funders;\r\n    mapping(address => uint256) private s_addressToAmountFunded;\r\n    AggregatorV3Interface private s_priceFeed;\r\n\r\n    // 通过 modifier 关键字可以定义修饰器，用于在指定方法之前执行(比如进行一些权限检查)\r\n    modifier onlyOwner() {\r\n        if (msg.sender != i_owner) revert FundMe__OnlyOwner();\r\n        _;\r\n    }\r\n\r\n    // Functions Order: 函数在文件中的编写顺序\r\n    //// constructor\r\n    //// receive\r\n    //// fallback\r\n    //// external\r\n    //// public\r\n    //// internal\r\n    //// private\r\n    //// view / pure\r\n\r\n    constructor(address priceFeedAddress) {\r\n        i_owner = msg.sender;\r\n        s_priceFeed = AggregatorV3Interface(priceFeedAddress);\r\n    }\r\n\r\n    fallback() external payable {\r\n        fund();\r\n    }\r\n\r\n    receive() external payable {\r\n        fund();\r\n    }\r\n\r\n    // payable：该函数需要发送一些 eth\r\n    function fund() public payable {\r\n        // require：断言，需要保证第一个参数为 true，才会执行后续的操作，否则终止操作并提示第二个参数的字符串\r\n        // 注意：如果在 require 终止之前进行了一些操作，仍然要支付 gas\r\n        // 同时，之前的操作都会回滚(类似于事务)\r\n        if (msg.value.getConversionRate(s_priceFeed) <= MINIMUM_USD) {\r\n            revert FundMe__SendEnough();\r\n        }\r\n        // 记录捐赠者的信息\r\n        s_addressToAmountFunded[msg.sender] = msg.value;\r\n        s_funders.push(msg.sender);\r\n    }\r\n\r\n    // 提款的方法\r\n    function withdraw() public onlyOwner {\r\n        // 由于直接操作 storage 中的数据会非常消耗 gas，所以采用读取一次，操作后复写一次的方式\r\n        address[] memory funders = s_funders;\r\n        for (uint256 funderIdx = 0; funderIdx < funders.length; funderIdx++) {\r\n            address funder = funders[funderIdx];\r\n            s_addressToAmountFunded[funder] = 0;\r\n        }\r\n        s_funders = new address[](0);\r\n\r\n        // 将合同的资产发送到调用者身上\r\n        /*\r\n        调用需要使用到 payable address 类型，该类型可以通过 payable(msg.sender) 方法得到，同时提供三种提取方法\r\n            1. transfer：运行错误会直接报错回滚\r\n            2. send：运行错误是返回布尔值\r\n            3. call：和 2 一样, 但类似于底层函数，推荐使用(具体原因进阶篇会说 - 关于 gas)\r\n        */\r\n        (bool callStatus, ) = i_owner.call{value: address(this).balance}(\"\");\r\n\r\n        if (!callStatus) {\r\n            revert FundMe__CallFailed();\r\n        }\r\n    }\r\n\r\n    function getAddressToAmountFunded(\r\n        address fundingAddress\r\n    ) public view returns (uint256) {\r\n        return s_addressToAmountFunded[fundingAddress];\r\n    }\r\n\r\n    function getFunder(uint256 index) public view returns (address) {\r\n        return s_funders[index];\r\n    }\r\n\r\n    function getOwner() public view returns (address) {\r\n        return i_owner;\r\n    }\r\n\r\n    function getPriceFeed() public view returns (AggregatorV3Interface) {\r\n        return s_priceFeed;\r\n    }\r\n}\r\n"
+    },
+    "contracts/PriceCovert.sol": {
+      "content": "// SPDX-License-Identifier: MIT\r\npragma solidity ^0.8.8;\r\n\r\n// 从 github 上引入接口文件(remix 会自动识别，如果是本地需要用 npm 安装)\r\nimport \"@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol\";\r\n\r\n/*\r\n定义一个库(不能声明静态变量，也不能发送 ETH)\r\n库中的所有方法都需要添加 internal 关键字\r\n*/\r\nlibrary PriceCovert {\r\n    /**\r\n     * get the usd correspoding to 1 eth\r\n     * @param priceFeed price feed contract address\r\n     */\r\n    function getPrice(\r\n        AggregatorV3Interface priceFeed\r\n    ) internal view returns (uint256) {\r\n        // 获取最新的数据\r\n        (, int256 answer, , , ) = priceFeed.latestRoundData();\r\n\r\n        // 返回的是一个 1eth 对应的 usd(solidity 中不存在浮点数)\r\n        return uint256(answer * 1e10);\r\n    }\r\n\r\n    /**\r\n     * 将输入的 eth 转换成对应的喂价合同的数据\r\n     * @param ethAmount 给出的 eth 价格(单位： 为)\r\n     * @param priceFeed 使用的喂价合同地址\r\n     */\r\n    function getConversionRate(\r\n        uint256 ethAmount,\r\n        AggregatorV3Interface priceFeed\r\n    ) internal view returns (uint256) {\r\n        // 获取当前 1eth 所能获得的美刀\r\n        uint256 usdPrice = getPrice(priceFeed);\r\n        // 将输入的 eth 换算成等价的 usd\r\n        return (usdPrice * ethAmount) / 1e18;\r\n    }\r\n}\r\n"
+    }
+  },
+  "settings": {
+    "optimizer": {
+      "enabled": false,
+      "runs": 200
+    },
+    "outputSelection": {
+      "*": {
+        "*": [
+          "abi",
+          "evm.bytecode",
+          "evm.deployedBytecode",
+          "evm.methodIdentifiers",
+          "metadata",
+          "devdoc",
+          "userdoc",
+          "storageLayout",
+          "evm.gasEstimates"
+        ],
+        "": [
+          "ast"
+        ]
+      }
+    },
+    "metadata": {
+      "useLiteralContent": true
+    }
+  }
+}

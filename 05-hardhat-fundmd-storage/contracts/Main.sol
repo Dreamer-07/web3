@@ -56,7 +56,7 @@ contract FundMe {
         // require：断言，需要保证第一个参数为 true，才会执行后续的操作，否则终止操作并提示第二个参数的字符串
         // 注意：如果在 require 终止之前进行了一些操作，仍然要支付 gas
         // 同时，之前的操作都会回滚(类似于事务)
-        if (msg.value.getConversionRate(s_priceFeed) >= MINIMUM_USD) {
+        if (msg.value.getConversionRate(s_priceFeed) <= MINIMUM_USD) {
             revert FundMe__SendEnough();
         }
         // 记录捐赠者的信息

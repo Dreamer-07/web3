@@ -1,7 +1,7 @@
 import { DeployFunction } from "hardhat-deploy/dist/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { developmentChains, networkConfig } from "../helper-hardhat-config";
-import verify from "../utils/verify"
+import verify from "../utils/verify";
 
 const deployFundMe: DeployFunction = async function (
   hre: HardhatRuntimeEnvironment
@@ -11,6 +11,9 @@ const deployFundMe: DeployFunction = async function (
   const { deployer } = await getNamedAccounts();
   const chainId: number = network.config.chainId!;
 
+  console.log(`chainId: ${chainId}`);
+
+  // 获取 eth -> usd 的喂价合同
   let ethUsdPriceFeedAddress: string;
   if (chainId == 31337) {
     const ethUsdAggregator = await deployments.get("MockV3Aggregator");
@@ -24,19 +27,17 @@ const deployFundMe: DeployFunction = async function (
     from: deployer,
     args: [ethUsdPriceFeedAddress],
     log: true,
-    waitConfirmations: networkConfig[network.name].blockConfirmations || 0;
+    waitConfirmations: networkConfig[network.name].blockConfirmations || 0,
   });
-  log(`fundme deployed at ${fundMe.address} `)
+  log(`fundme deployed at ${fundMe.address} `);
 
-
-  if(
-    !developmentChains.includes(network.name)
-    &&
+  if (
+    !developmentChains.includes(network.name) &&
     process.env.ETHERSCAN_API_KEY
   ) {
-    await verify(fundMe.address, [ethUsdPriceFeedAddress])
+    await verify(fundMe.address, [ethUsdPriceFeedAddress]);
   }
 };
 
-export default deployFundMe
-deployFundMe.tags = ["all", "fundMe"]
+export default deployFundMe;
+deployFundMe.tags = ["all", "fundMe"];
