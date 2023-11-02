@@ -1,13 +1,7 @@
-# Sample Hardhat Project
+# Hardhat 框架的使用(1)
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a script that deploys that contract.
-
-Try running some of the following tasks:
-
-```shell
-npx hardhat help
-npx hardhat test
-REPORT_GAS=true npx hardhat test
-npx hardhat node
-npx hardhat run scripts/deploy.ts
-```
+- 搭建一个众筹的 dapp 程序
+- 通过 hardhat-deploy 并根据规范(建立 deploy)定义部署的过程
+- 学习通过 hardhat 的 HardhatRuntimeEnvironment(01-deploy-fundme.ts) 去部署合约
+- 学习编写 unit & staging 测试
+- 学习通过 solhint 进行 sol 代码的格式化(类似于 eslint)
